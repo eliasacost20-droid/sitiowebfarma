@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  /* Achicamos la fuente base para meter un efecto de "zoom out" en toda la página. 
+     Tailwind usa 'rem', por lo que TODO (márgenes, letras, botones) se ajusta. */
+  font-size: 14px; 
+}

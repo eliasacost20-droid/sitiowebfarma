@@ -1,0 +1,40 @@
+Propuesta de Implementación: Pantalla de Finalización de Compra (Checkout)
+
+A continuación, detallamos las funcionalidades que se van a desarrollar para la pantalla de pagos de la tienda, basándonos en los requerimientos del diseño visual propuesto.
+
+✅ LO QUE SÍ SE VA A AGREGAR (Incluido en el desarrollo interno)
+
+1. Formulario de Detalles de Facturación:
+   - Campos completos para el cliente: Nombre, Apellidos, País/Región, Dirección exacta (Calle, número, departamento), Población/Ciudad, Región/Provincia, Código Postal, Teléfono y Correo Electrónico.
+
+2. Opción de Envío a Diferente Dirección:
+   - Una casilla de verificación (checkbox) que despliega un segundo formulario completo por si el cliente quiere enviar su pedido a otra dirección (ej. regalos o envíos al trabajo).
+
+3. Notas del Pedido:
+   - Campo de texto opcional para que el cliente deje instrucciones especiales para la entrega.
+
+4. Resumen del Pedido en Tiempo Real:
+   - Tabla clara mostrando los productos seleccionados en el carrito, el subtotal, el costo de envío (ej: precio fijo) y el Total Final a pagar.
+
+5. Opciones de Método de Pago:
+   - Selección dinámica entre: Transferencia bancaria directa, Pago en efectivo/presencial, e Integración con pasarelas de pago (ej. Mercado Pago).
+   - Textos explicativos para cada opción (Ej: instrucciones para transferencia bancaria).
+
+6. Sistema de Cupones y Suscripciones:
+   - Botón interactivo superior "👉 ¿Tienes un cupón?" para ingresar códigos de descuento.
+   - Casilla de verificación para suscribirse al boletín de correos (newsletter) para recibir promociones y descuentos.
+
+
+❌ LO QUE NO SE VA A AGREGAR DE FORMA NATIVA (O requiere integraciones extra de terceros)
+
+1. Cálculo Automático Avanzado de Envíos Nacionales/Internacionales por Código Postal:
+   - A menos que se contrate una API de envíos específica (como DHL, FedEx, etc.), los envíos se configurarán con "Tarifa Plana" manual o "Envío Gratis". 
+
+2. Guardado de Tarjetas de Crédito dentro de la página:
+   - Por normativas de seguridad PCI y para evitar riesgos, las compras con tarjetas de crédito no se procesan ni "guardan" en nuestro servidor. Se delega 100% a la plataforma de Mercado Pago (o similares) de forma externa y segura.
+
+3. Validación en tiempo real del número de tarjeta de crédito (Live formatting):
+   - Al usar Mercado Pago, todo este flujo de validación se realiza en la pasarela externa de ellos, no dentro del formulario de detalles de facturación.
+
+---
+Para comentarios, duda o aprobación, por favor responder este documento.
