@@ -1,5 +1,5 @@
 {
-  "name": "farmavida",
+  "name": "bodylab",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,9 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
+    "i18next": "^25.8.20",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-i18next": "^16.5.8"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",

@@ -1,0 +1,326 @@
+L126 [D:0]: setEditingId(null);
+L127 [D:0]: };
+L128 [D:0]: 
+L129 [D:0]: return (
+L130 [D:1]: <div className="w-full flex flex-col gap-6">
+L131 [D:2]: <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl w-fit">
+L132 [D:2]: <button onClick={() => setActiveTab('products')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Inventario de Productos</button>
+L133 [D:2]: <button onClick={() => setActiveTab('banners')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'banners' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Anuncios y Carrusel</button>
+L134 [D:2]: <button onClick={() => setActiveTab('reviews')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'reviews' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Control de Reseñas</button>
+L135 [D:1]: </div>
+L136 [D:1]: 
+L137 [D:1]: {activeTab === 'products' && (
+L138 [D:2]: <div className="flex flex-col xl:flex-row gap-8 w-full">
+L139 [D:2]: {/* Formulario */}
+L140 [D:3]: <div className="w-full xl:w-1/3">
+L141 [D:4]: <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-0">
+L142 [D:4]: <h4 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+L143 [D:4]: <Sparkles className="w-6 h-6 text-teal-500" />
+L144 [D:4]: {editingId ? 'Editar Producto' : 'Cargar Nuevo Producto'}
+L145 [D:4]: </h4>
+L146 [D:4]: <form onSubmit={handleSave} className="space-y-4">
+L147 [D:5]: <div>
+L148 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Nombre</label>
+L149 [D:5]: <input required name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Vitamina C..." />
+L150 [D:4]: </div>
+L151 [D:5]: <div className="grid grid-cols-2 gap-4">
+L152 [D:6]: <div>
+L153 [D:6]: <label className="block text-sm font-bold text-slate-700 mb-1">Marca</label>
+L154 [D:6]: <input required name="brand" value={formData.brand} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: NutriLife" />
+L155 [D:5]: </div>
+L156 [D:6]: <div>
+L157 [D:6]: <label className="block text-sm font-bold text-slate-700 mb-1">Precio (Gs.)</label>
+L158 [D:6]: <input required value={formData.price} onChange={handlePriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="1.000" />
+L159 [D:5]: </div>
+L160 [D:4]: </div>
+L161 [D:5]: <div>
+L162 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Categoría</label>
+L163 [D:5]: <select required name="category" value={formData.category} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400">
+L164 [D:5]: <option value="">Seleccionar...</option>
+L165 [D:5]: <option value="Vitaminas">Vitaminas</option>
+L166 [D:5]: <option value="Cuidado Personal">Cuidado Personal</option>
+L167 [D:5]: <option value="Dermocosmética">Dermocosmética</option>
+L168 [D:5]: <option value="Mamá y Bebé">Mamá y Bebé</option>
+L169 [D:5]: <option value="Primeros Auxilios">Primeros Auxilios</option>
+L170 [D:5]: </select>
+L171 [D:4]: </div>
+L172 [D:5]: <div>
+L173 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Descripción</label>
+L174 [D:5]: <textarea required name="desc" value={formData.desc} onChange={handleChange} rows="2" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 resize-none"></textarea>
+L175 [D:4]: </div>
+L176 [D:5]: <div>
+L177 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Foto del Producto</label>
+L178 [D:6]: <div className="flex items-center gap-3 w-full bg-slate-50 border border-slate-200 rounded-xl p-2 focus-within:border-teal-400 transition-all">
+L179 [D:6]: {formData.image && (
+L180 [D:6]: <img src={formData.image.startsWith('http') || formData.image.startsWith('data') || formData.image.startsWith('/') ? formData.image : '/placeholder.png'} alt="Preview" className="w-12 h-12 object-cover rounded-lg shrink-0 border border-slate-100 bg-white" />
+L181 [D:6]: )}
+L182 [D:6]: <input required={!formData.image} type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200 transition-all cursor-pointer outline-none" />
+L183 [D:5]: </div>
+L184 [D:4]: </div>
+L185 [D:5]: <div>
+L186 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Etiqueta (Opcional)</label>
+L187 [D:5]: <input name="badge" value={formData.badge} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Nuevo, Oferta, -15%" />
+L188 [D:4]: </div>
+L189 [D:5]: <div className="flex gap-2 pt-2">
+L190 [D:5]: {editingId && <button type="button" onClick={handleCancelNew} className="p-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors w-1/3">Cancelar</button>}
+L191 [D:5]: <button type="submit" className={`${editingId ? 'w-2/3' : 'w-full'} p-3 rounded-xl font-black text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm`}>
+L192 [D:5]: {editingId ? 'Guardar Cambios' : '🚀 Cargar Producto'}
+L193 [D:5]: </button>
+L194 [D:4]: </div>
+L195 [D:4]: </form>
+L196 [D:3]: </div>
+L197 [D:2]: </div>
+L198 [D:2]: 
+L199 [D:2]: {/* Lista */}
+L200 [D:3]: <div className="w-full xl:w-2/3">
+L201 [D:4]: <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+L202 [D:5]: <div className="overflow-x-auto">
+L203 [D:5]: <table className="w-full text-left">
+L204 [D:5]: <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+L205 [D:5]: <tr>
+L206 [D:5]: <th className="p-4">Producto</th>
+L207 [D:5]: <th className="p-4">Precio</th>
+L208 [D:5]: <th className="p-4">Categoría</th>
+L209 [D:5]: <th className="p-4">Acciones</th>
+L210 [D:5]: </tr>
+L211 [D:5]: </thead>
+L212 [D:5]: <tbody className="divide-y divide-slate-100">
+L213 [D:5]: {products.map(p => (
+L214 [D:5]: <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+L215 [D:5]: <td className="p-4">
+L216 [D:6]: <div className="flex items-center gap-3">
+L217 [D:6]: <img src={p.image} className="w-12 h-12 rounded-lg object-cover bg-slate-100 shrink-0" />
+L218 [D:7]: <div className="min-w-0">
+L219 [D:7]: <p className="font-bold text-sm text-slate-800 truncate max-w-[150px]">{p.name}</p>
+L220 [D:7]: <p className="text-xs text-slate-400">{p.brand}</p>
+L221 [D:6]: </div>
+L222 [D:5]: </div>
+L223 [D:5]: </td>
+L224 [D:5]: <td className="p-4 font-black text-teal-600 whitespace-nowrap">Gs. {p.price}</td>
+L225 [D:5]: <td className="p-4">
+L226 [D:5]: <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">{p.category}</span>
+L227 [D:5]: </td>
+L228 [D:5]: <td className="p-4">
+L229 [D:6]: <div className="flex items-center gap-2 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
+L230 [D:6]: <button onClick={() => handleEdit(p)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">Editar</button>
+L231 [D:6]: <button onClick={() => handleDelete(p.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+L232 [D:5]: </div>
+L233 [D:5]: </td>
+L234 [D:5]: </tr>
+L235 [D:5]: ))}
+L236 [D:5]: {products.length === 0 && (
+L237 [D:5]: <tr><td colSpan="4" className="p-10 text-center text-slate-400">No hay productos en la tienda.</td></tr>
+L238 [D:5]: )}
+L239 [D:5]: </tbody>
+L240 [D:5]: </table>
+L241 [D:4]: </div>
+L242 [D:3]: </div>
+L243 [D:2]: </div>
+L244 [D:1]: </div>
+L245 [D:1]: )}
+L246 [D:1]: 
+L247 [D:1]: {activeTab === 'banners' && (
+L248 [D:2]: <div className="flex flex-col xl:flex-row gap-8 w-full">
+L249 [D:3]: <div className="w-full xl:w-1/3">
+L250 [D:4]: <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-0">
+L251 [D:4]: <h4 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+L252 [D:4]: <Sparkles className="w-6 h-6 text-teal-500" />
+L253 [D:4]: {editingBannerId ? 'Editar Anuncio' : 'Crear Anuncio'}
+L254 [D:4]: </h4>
+L255 [D:4]: <form onSubmit={handleBannerSave} className="space-y-4">
+L256 [D:5]: <div>
+L257 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Título Grande</label>
+L258 [D:5]: <input required value={bannerData.title} onChange={e => setBannerData({...bannerData, title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Mega Oferta..." />
+L259 [D:4]: </div>
+L260 [D:5]: <div>
+L261 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Subtítulo Descriptivo</label>
+L262 [D:5]: <textarea required value={bannerData.subtitle} onChange={e => setBannerData({...bannerData, subtitle: e.target.value})} rows="2" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 resize-none" placeholder="Llevate todo al 50%..."></textarea>
+L263 [D:4]: </div>
+L264 [D:5]: <div className="grid grid-cols-2 gap-4">
+L265 [D:6]: <div>
+L266 [D:6]: <label className="block text-sm font-bold text-slate-700 mb-1">Cinta / Etiqueta</label>
+L267 [D:6]: <input value={bannerData.badge} onChange={e => setBannerData({...bannerData, badge: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="OFERTA ✨" />
+L268 [D:5]: </div>
+L269 [D:6]: <div>
+L270 [D:6]: <label className="block text-sm font-bold text-slate-700 mb-1">Texto del Botón</label>
+L271 [D:6]: <input required value={bannerData.cta} onChange={e => setBannerData({...bannerData, cta: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ver Mega Promo" />
+L272 [D:5]: </div>
+L273 [D:4]: </div>
+L274 [D:5]: <div>
+L275 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Filtro de Color / Sombra</label>
+L276 [D:5]: <select required value={bannerData.color} onChange={e => setBannerData({...bannerData, color: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400">
+L277 [D:5]: <option value="from-teal-900/90 to-teal-800/40">Turquesa Farma</option>
+L278 [D:5]: <option value="from-blue-900/90 to-blue-800/40">Azul Clínico</option>
+L279 [D:5]: <option value="from-rose-900/90 to-rose-800/40">Rosa Maternal</option>
+L280 [D:5]: <option value="from-amber-900/90 to-amber-800/40">Ámbar Vitamina</option>
+L281 [D:5]: <option value="from-slate-900/90 to-slate-800/40">Gris Especial</option>
+L282 [D:5]: </select>
+L283 [D:4]: </div>
+L284 [D:5]: <div>
+L285 [D:5]: <label className="block text-sm font-bold text-slate-700 mb-1">Foto de Fondo</label>
+L286 [D:6]: <div className="flex items-center gap-3 w-full bg-slate-50 border border-slate-200 rounded-xl p-2 focus-within:border-teal-400 transition-all">
+L287 [D:6]: {bannerData.bgImg && (
+L288 [D:6]: <img src={bannerData.bgImg} alt="Preview" className="w-12 h-12 object-cover rounded-lg shrink-0 border border-slate-100 bg-white" />
+L289 [D:6]: )}
+L290 [D:6]: <input required={!bannerData.bgImg} type="file" accept="image/*" onChange={handleBannerImageUpload} className="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200 transition-all cursor-pointer outline-none" />
+L291 [D:5]: </div>
+L292 [D:4]: </div>
+L293 [D:5]: <div className="flex gap-2 pt-2">
+L294 [D:5]: {editingBannerId && <button type="button" onClick={() => { setBannerData({ title: '', subtitle: '', cta: '', bgImg: '', color: 'from-amber-900/90 to-amber-800/40', badge: ''}); setEditingBannerId(null); }} className="p-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors w-1/3">Cancelar</button>}
+L295 [D:5]: <button type="submit" className={`${editingBannerId ? 'w-2/3' : 'w-full'} p-3 rounded-xl font-black text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm`}>
+L296 [D:5]: {editingBannerId ? 'Guardar Cambios' : '🚀 Activar Anuncio'}
+L297 [D:5]: </button>
+L298 [D:4]: </div>
+L299 [D:4]: </form>
+L300 [D:3]: </div>
+L301 [D:2]: </div>
+L302 [D:3]: <div className="w-full xl:w-2/3">
+L303 [D:4]: <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+L304 [D:5]: <div className="overflow-x-auto">
+L305 [D:5]: <table className="w-full text-left">
+L306 [D:5]: <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+L307 [D:5]: <tr>
+L308 [D:5]: <th className="p-4">Anuncio</th>
+L309 [D:5]: <th className="p-4">Estilo</th>
+L310 [D:5]: <th className="p-4">Acciones</th>
+L311 [D:5]: </tr>
+L312 [D:5]: </thead>
+L313 [D:5]: <tbody className="divide-y divide-slate-100">
+L314 [D:5]: {slides.map(b => (
+L315 [D:5]: <tr key={b.id} className="hover:bg-slate-50/50 transition-colors group">
+L316 [D:5]: <td className="p-4">
+L317 [D:6]: <div className="flex items-center gap-3">
+L318 [D:7]: <div className="w-20 h-10 rounded-lg overflow-hidden relative shrink-0">
+L319 [D:7]: <img src={b.bgImg} className="absolute inset-0 w-full h-full object-cover" />
+L320 [D:8]: <div className={`absolute inset-0 bg-gradient-to-r ${b.color}`} />
+L321 [D:7]: </div>
+L322 [D:8]: <div className="min-w-0">
+L323 [D:8]: <p className="font-bold text-sm text-slate-800 truncate">{b.title}</p>
+L324 [D:8]: <p className="text-xs text-slate-400 truncate">{b.subtitle}</p>
+L325 [D:7]: </div>
+L326 [D:6]: </div>
+L327 [D:6]: </td>
+L328 [D:6]: <td className="p-4">
+L329 [D:6]: <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md capitalize">{b.color.split('-')[1]}</span>
+L330 [D:6]: </td>
+L331 [D:6]: <td className="p-4">
+L332 [D:7]: <div className="flex items-center gap-2 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
+L333 [D:7]: <button onClick={() => handleBannerEdit(b)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">Editar</button>
+L334 [D:7]: <button onClick={() => handleBannerDelete(b.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+L335 [D:6]: </div>
+L336 [D:6]: </td>
+L337 [D:6]: </tr>
+L338 [D:6]: ))}
+L339 [D:6]: {slides.length === 0 && (
+L340 [D:6]: <tr><td colSpan="3" className="p-10 text-center text-slate-400">No hay banners activos.</td></tr>
+L341 [D:6]: )}
+L342 [D:6]: </tbody>
+L343 [D:6]: </table>
+L344 [D:5]: </div>
+L345 [D:4]: </div>
+L346 [D:3]: </div>
+L347 [D:2]: </div>
+L348 [D:2]: )}
+L349 [D:2]: 
+L350 [D:2]: {activeTab === 'reviews' && (
+L351 [D:3]: <div className="flex flex-col gap-8 w-full">
+L352 [D:4]: <div className="w-full">
+L353 [D:5]: <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm p-6">
+L354 [D:5]: <h4 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+L355 [D:5]: Control de Reseñas
+L356 [D:5]: </h4>
+L357 [D:6]: <div className="overflow-x-auto">
+L358 [D:6]: <table className="w-full text-left">
+L359 [D:6]: <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+L360 [D:6]: <tr>
+L361 [D:6]: <th className="p-4">Usuario</th>
+L362 [D:6]: <th className="p-4">Prod ID</th>
+L363 [D:6]: <th className="p-4">Comentario y Respuesta</th>
+L364 [D:6]: <th className="p-4">Acciones</th>
+L365 [D:6]: </tr>
+L366 [D:6]: </thead>
+L367 [D:6]: <tbody className="divide-y divide-slate-100">
+L368 [D:6]: {reviews.map(r => (
+L369 [D:6]: <tr key={r.id} className="hover:bg-slate-50/50 transition-colors group">
+L370 [D:6]: <td className="p-4 font-bold text-sm text-slate-800">{r.author}</td>
+L371 [D:6]: <td className="p-4 font-bold text-teal-600">{r.productId}</td>
+L372 [D:6]: <td className="p-4">
+L373 [D:6]: <p className="text-xs text-slate-600 max-w-md truncate">{r.text}</p>
+L374 [D:6]: {r.adminReply && (
+L375 [D:7]: <div className="bg-teal-50 p-2 rounded-lg border border-teal-100 mt-2 max-w-md">
+L376 [D:7]: <p className="text-[10px] font-bold text-teal-800 uppercase">Respuesta:</p>
+L377 [D:7]: <p className="text-xs text-teal-700 italic truncate">{r.adminReply}</p>
+L378 [D:6]: </div>
+L379 [D:6]: )}
+L380 [D:6]: </td>
+L381 [D:6]: <td className="p-4">
+L382 [D:7]: <div className="flex flex-col gap-2">
+L383 [D:7]: <button onClick={() => {
+L384 [D:7]: setReplyingToReview(r);
+L385 [D:7]: setReplyText(r.adminReply || '');
+L386 [D:7]: }} className="p-1 px-2 text-teal-600 hover:bg-teal-50 rounded-lg text-xs font-bold border border-teal-100">
+L387 [D:7]: Contestar
+L388 [D:7]: </button>
+L389 [D:7]: <button onClick={() => {
+L390 [D:7]: if(window.confirm('¿Borrar reseña inapropiada?')) {
+L391 [D:7]: setReviews(reviews.filter(rev => rev.id !== r.id));
+L392 [D:7]: }
+L393 [D:7]: }} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-bold">
+L394 [D:7]: Borrar
+L395 [D:7]: </button>
+L396 [D:6]: </div>
+L397 [D:6]: </td>
+L398 [D:6]: </tr>
+L399 [D:6]: ))}
+L400 [D:6]: {reviews.length === 0 && (
+L401 [D:6]: <tr><td colSpan="4" className="p-10 text-center text-slate-400">No hay reseñas todavía.</td></tr>
+L402 [D:6]: )}
+L403 [D:6]: </tbody>
+L404 [D:6]: </table>
+L405 [D:5]: </div>
+L406 [D:4]: </div>
+L407 [D:3]: </div>
+L408 [D:2]: </div>
+L409 [D:2]: )}
+L410 [D:2]: 
+L411 [D:2]: {/* Modal para Contestar */}
+L412 [D:2]: {replyingToReview && (
+L413 [D:3]: <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+L414 [D:4]: <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-300">
+L415 [D:4]: <h3 className="text-xl font-black text-slate-800 mb-2">Responder a {replyingToReview.author}</h3>
+L416 [D:4]: <p className="text-sm text-slate-500 mb-4">Escribí tu respuesta pública que aparecerá debajo del comentario:</p>
+L417 [D:4]: <textarea
+L418 [D:4]: autoFocus
+L419 [D:4]: value={replyText}
+L420 [D:4]: onChange={(e) => setReplyText(e.target.value)}
+L421 [D:4]: className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-teal-400 font-medium transition-all resize-none min-h-[100px]"
+L422 [D:4]: placeholder="Ej: ¡Muchas gracias por tu compra..."
+L423 [D:4]: ></textarea>
+L424 [D:5]: <div className="flex gap-3 mt-6">
+L425 [D:5]: <button
+L426 [D:5]: onClick={() => { setReplyingToReview(null); setReplyText(''); }}
+L427 [D:5]: className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors"
+L428 [D:5]: >
+L429 [D:5]: Cancelar
+L430 [D:5]: </button>
+L431 [D:5]: <button
+L432 [D:5]: onClick={() => {
+L433 [D:5]: setReviews(reviews.map(rev => rev.id === replyingToReview.id ? { ...rev, adminReply: replyText } : rev));
+L434 [D:5]: setReplyingToReview(null);
+L435 [D:5]: setReplyText('');
+L436 [D:5]: }}
+L437 [D:5]: className="flex-1 py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl transition-colors shadow-sm"
+L438 [D:5]: >
+L439 [D:5]: Enviar Respuesta
+L440 [D:5]: </button>
+L441 [D:4]: </div>
+L442 [D:3]: </div>
+L443 [D:2]: </div>
+L444 [D:2]: )}
+L445 [D:2]: 
+L446 [D:1]: </div>
+L447 [D:0]: </div>
+L448 [D:0]: );
+L449 [D:0]: }
+L450 [D:0]: 
+L451 [D:0]: 
