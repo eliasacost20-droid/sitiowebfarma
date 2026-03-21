@@ -49,7 +49,7 @@ export default function App() {
       const { data: prods } = await supabase.from('products').select('*').order('created_at', { ascending: false });
       if (prods) setProducts(prods);
       const { data: bals } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
-      if (bals) setSlides(bals);
+      if (bals) setSlides(bals.map(b => ({ ...b, productId: b.product_id })));
       const { data: revs } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
       if (revs) setReviews(revs);
     }
@@ -301,7 +301,7 @@ function AdminPanel() {
   // Products state
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', brand: '', category: '', desc: '', price: '', image: '', badge: ''
+    name: '', brand: '', category: '', desc: '', price: '', price_brl: '', image: '', badge: '', shipping_title: '', shipping_desc: '', features: ''
   });
 
   // Banners state
@@ -329,14 +329,17 @@ function AdminPanel() {
     e.preventDefault();
     const payload = { ...bannerData };
     if (payload.productId === '') payload.product_id = null;
-    else payload.product_id = payload.productId; // mapping camelCase to snake_case if needed by Supabase, wait actually my table has product_id but form has productId
+    else payload.product_id = payload.productId; 
+    delete payload.productId; 
     
     if (editingBannerId) {
       const { data, error } = await supabase.from('banners').update(payload).eq('id', editingBannerId).select().single();
-      if (!error && data) setSlides(slides.map(b => b.id === editingBannerId ? data : b));
+      if (error) { alert("Error guardando el anuncio: " + error.message); return; }
+      if (data) setSlides(slides.map(b => b.id === editingBannerId ? { ...data, productId: data.product_id } : b));
     } else {
       const { data, error } = await supabase.from('banners').insert(payload).select().single();
-      if (!error && data) setSlides([data, ...slides]);
+      if (error) { alert("Error al guardar anuncio: " + error.message); console.error(error); return; }
+      if (data) setSlides([{ ...data, productId: data.product_id }, ...slides]);
     }
     setBannerData({ title: '', subtitle: '', cta: '', bgImg: '', color: 'from-amber-900/90 to-amber-800/40', badge: '', productId: '' });
     setEditingBannerId(null);
@@ -363,8 +366,20 @@ function AdminPanel() {
     return parseInt(raw, 10).toLocaleString('de-DE'); // 1.000
   };
 
+  const formatBrlPrice = (val) => {
+    if (!val) return '';
+    let raw = String(val).replace(/\D/g, '');
+    if (!raw) return '';
+    const num = parseInt(raw, 10) / 100;
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const handlePriceChange = (e) => {
     setFormData({ ...formData, price: formatPrice(e.target.value) });
+  };
+
+  const handleBrlPriceChange = (e) => {
+    setFormData({ ...formData, price_brl: formatBrlPrice(e.target.value) });
   };
 
   const handleChange = (e) => {
@@ -393,7 +408,7 @@ function AdminPanel() {
       brand: prod.brand || '', 
       category: prod.category || '', 
       desc: prod.desc || '', 
-      price: prod.price || '', 
+      price: prod.price || '', price_brl: prod.price_brl || '', shipping_title: prod.shipping_title || '', shipping_desc: prod.shipping_desc || '', features: Array.isArray(prod.features) ? prod.features.join(', ') : (prod.features || ''), 
       image: prod.image || '',
       badge: prod.badge || ''
     });
@@ -410,17 +425,19 @@ function AdminPanel() {
     e.preventDefault();
     if (editingId) {
       const { data, error } = await supabase.from('products').update(formData).eq('id', editingId).select().single();
-      if (!error && data) setProducts(products.map(p => p.id === editingId ? data : p));
+      if (error) { alert("Error guardando producto: " + error.message); return; }
+      if (data) setProducts(products.map(p => p.id === editingId ? data : p));
     } else {
       const { data, error } = await supabase.from('products').insert(formData).select().single();
-      if (!error && data) setProducts([data, ...products]);
+      if (error) { alert("Error al guardar: " + error.message); return; }
+      if (data) setProducts([data, ...products]);
     }
-    setFormData({ name: '', brand: '', category: '', desc: '', price: '', image: '', badge: '' });
+    setFormData({ name: '', brand: '', category: '', desc: '', price: '', price_brl: '', image: '', badge: '', shipping_title: '', shipping_desc: '', features: '' });
     setEditingId(null);
   };
 
   const handleCancelNew = () => {
-    setFormData({ name: '', brand: '', category: '', desc: '', price: '', image: '', badge: '' });
+    setFormData({ name: '', brand: '', category: '', desc: '', price: '', price_brl: '', image: '', badge: '', shipping_title: '', shipping_desc: '', features: '' });
     setEditingId(null);
   };
 
@@ -451,10 +468,19 @@ function AdminPanel() {
                 <label className="block text-sm font-bold text-slate-700 mb-1">Marca</label>
                 <input required name="brand" value={formData.brand} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: NutriLife" />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Precio (Gs.)</label>
-                <input required value={formData.price} onChange={handlePriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="1.000" />
-              </div>
+              <PriceInputContainer formData={formData} handlePriceChange={handlePriceChange} handleBrlPriceChange={handleBrlPriceChange} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Beneficios clave (Separados por coma)</label>
+              <textarea name="features" value={formData.features} onChange={handleChange} rows="2" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Refuerza defensas, Sin azúcar añadido, Hipoalergénico"></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Título de Envío (Opcional)</label>
+              <input name="shipping_title" value={formData.shipping_title} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Envío Express Garantizado" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Detalle de Envío (Opcional)</label>
+              <textarea name="shipping_desc" value={formData.shipping_desc} onChange={handleChange} rows="2" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Llega hoy si compras antes de las 18:00hs."></textarea>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Categoría</label>
@@ -519,7 +545,7 @@ function AdminPanel() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-4 font-black text-teal-600 whitespace-nowrap">Gs. {p.price}</td>
+                    <td className="p-4">{p.price && <div className="font-black text-teal-600">Gs. {p.price}</div>} {p.price_brl && <div className="text-xs text-slate-400 font-bold">R$ {p.price_brl}</div>}</td>
                     <td className="p-4">
                       <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">{p.category}</span>
                     </td>
@@ -571,7 +597,7 @@ function AdminPanel() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Producto Enlazado</label>
-                    <select value={bannerData.productId || ''} onChange={e => setBannerData({...bannerData, productId: e.target.value ? parseInt(e.target.value, 10) : ''})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-700 text-sm overflow-hidden">
+                    <select value={bannerData.productId || ''} onChange={e => setBannerData({...bannerData, productId: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-700 text-sm overflow-hidden">
                       <option value="">(Sin Enlazar)</option>
                       {products.map(p => (
                         <option key={p.id} value={p.id}>Gs. {p.price} | {p.name}</option>
@@ -861,7 +887,7 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
           <div className="mb-6 space-y-3">
             <h3 className="font-bold text-slate-800 text-base">{t("Beneficios_clave")}</h3>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {product.features?.map((feat, idx) => (
+              {(typeof product.features === 'string' ? product.features.split(',').map(s => s.trim()).filter(s => s) : (Array.isArray(product.features) ? product.features : [])).map((feat, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 text-sm">
                   <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
                   <span className="font-medium">{t(feat)}</span>
@@ -874,7 +900,9 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
             <div className="flex flex-col w-full sm:w-auto min-w-[140px]">
               <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">{t("Precio_Final")}</span>
               <span className="text-4xl font-black text-teal-600 tracking-tight">
-                <span className="text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{product.price}
+                {product.price && <><span className="text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{product.price}</>}
+                {product.price && product.price_brl && <span className="text-slate-300 mx-3 font-normal">|</span>}
+                {product.price_brl && <><span className="text-xl text-teal-500 font-bold align-top mr-1">R$</span>{product.price_brl}</>}
               </span>
             </div>
             <button 
@@ -892,8 +920,8 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
               <Truck className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-800 text-sm">{t("Envio_Express")}</h4>
-              <p className="text-xs text-slate-600 mt-0.5 font-medium">Llega hoy si comprás antes de las 18:00 hs. <span className="font-bold text-blue-600">{t("Envio_gratis")}</span> en Gran Asunción.</p>
+              <h4 className="font-bold text-slate-800 text-sm">{product.shipping_title || t("Envio_Express")}</h4>
+              <p className="text-xs text-slate-600 mt-0.5 font-medium">{product.shipping_desc ? product.shipping_desc : <>Llega hoy si comprás antes de las 18:00 hs. <span className="font-bold text-blue-600">{t("Envio_gratis")}</span> en Gran Asunción.</>}</p>
             </div>
           </div>
 
@@ -924,7 +952,9 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{relProd.brand}</span>
                 <h3 className="text-xl font-bold text-slate-800 leading-tight mb-3 line-clamp-2">{t(relProd.name)}</h3>
                 <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                  <span className="text-2xl font-black text-teal-600">Gs. {relProd.price}</span>
+                  {relProd.price && <span className="text-2xl font-black text-teal-600">Gs. {relProd.price}</span>}
+                  {relProd.price && relProd.price_brl && <span className="text-slate-300 mx-2 text-xl font-normal">|</span>}
+                  {relProd.price_brl && <span className="text-2xl font-black text-teal-600">R$ {relProd.price_brl}</span>}
                   <div className="bg-teal-50 text-teal-600 p-3 rounded-xl group-hover:bg-teal-600 group-hover:text-white transition-all shadow-sm">
                     <ArrowRight className="w-5 h-5" />
                   </div>
@@ -1022,7 +1052,9 @@ function Navbar({ onSelectProduct, cartCount, favoritesCount, onOpenCart, onOpen
                         <p className="text-xs text-slate-500 truncate mt-0.5">{t(product.desc)}</p>
                       </div>
                       <div className="font-black text-teal-600 whitespace-nowrap bg-teal-50 px-3 py-1.5 rounded-xl">
-                        Gs. {product.price}
+                        {product.price ? `Gs. ${product.price}` : ''} 
+                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
+                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
                       </div>
                     </li>
                   ))}
@@ -1106,9 +1138,13 @@ function HeroCarousel() {
   const prevSlide = () => setCurrent((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
 
   useEffect(() => {
+    if (slides.length === 0) return;
     const timer = setInterval(nextSlide, 6000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides]);
+
+  if (!slides || slides.length === 0) return null;
+
 
   return (
     <section className="relative w-full h-[280px] sm:h-[360px] rounded-3xl overflow-hidden shadow-xl group">
@@ -1271,7 +1307,9 @@ function FeaturedProducts({ onSelectProduct, onAddToCart }) {
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">{t("Precio")}</span>
                   <span className="text-2xl font-black text-teal-600">
-                    Gs. {product.price}
+                    {product.price ? `Gs. ${product.price}` : ''} 
+                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
+                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
                 </div>
                 <button 
@@ -1412,7 +1450,9 @@ function FullCatalog({ onSelectProduct, onAddToCart, onBack, initialCategory }) 
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">{t("Precio")}</span>
                   <span className="text-2xl font-black text-teal-600">
-                    Gs. {product.price}
+                    {product.price ? `Gs. ${product.price}` : ''} 
+                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
+                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
                 </div>
                 <button 
@@ -1946,7 +1986,9 @@ function FavoritesPage({ items, onSelectProduct, onAddToCart, onRemove, onBack }
                 
                 <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                   <span className="text-2xl font-black text-teal-600">
-                    Gs. {product.price}
+                    {product.price ? `Gs. ${product.price}` : ''} 
+                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
+                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
                   <button 
                     onClick={(e) => { 
@@ -2258,6 +2300,25 @@ function ReviewsModal({ product, onClose }) {
 
         </div>
       </div>
+    </div>
+  );
+}
+function PriceInputContainer({ formData, handlePriceChange, handleBrlPriceChange }) {
+  const [currency, setCurrency] = useState('GS');
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <label className="block text-sm font-bold text-slate-700">Precio</label>
+        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+          <button type="button" onClick={() => setCurrency('GS')} className={`px-2 py-1 flex-1 text-[10px] uppercase font-bold rounded-md transition-all ${currency === 'GS' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>Gs.</button>
+          <button type="button" onClick={() => setCurrency('BRL')} className={`px-2 py-1 flex-1 text-[10px] uppercase font-bold rounded-md transition-all ${currency === 'BRL' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>R$</button>
+        </div>
+      </div>
+      {currency === 'GS' ? (
+        <input required value={formData.price} onChange={handlePriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="1.000" />
+      ) : (
+        <input required value={formData.price_brl} onChange={handleBrlPriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="0,00" />
+      )}
     </div>
   );
 }
