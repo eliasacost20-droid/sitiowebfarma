@@ -39,7 +39,7 @@ const initialReviewsData = [];
 
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [products, setProducts] = useState([]);
   const [slides, setSlides] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -96,14 +96,21 @@ export default function App() {
     };
   }, []);
 
-  const handleAdminAuth = (e) => {
+  const [adminAuthLoading, setAdminAuthLoading] = useState(false);
+  const handleAdminAuth = async (e) => {
     e.preventDefault();
-    if (adminPassword === 'admin123') { 
-       setAdminModalOpen(true);
-       setAdminInputVisible(false);
-       setAdminPassword('');
-    } else {
+    setAdminAuthLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: 'admin@farmavida.com',
+      password: adminPassword,
+    });
+    setAdminAuthLoading(false);
+    
+    if (error) {
        alert("Contraseña incorrecta rey.");
+       setAdminPassword('');
+    } else if (data.session) {
+       setAdminModalOpen(true);
        setAdminInputVisible(false);
        setAdminPassword('');
     }
@@ -306,10 +313,48 @@ function AdminPanel() {
 
   // Banners state
   const [editingBannerId, setEditingBannerId] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
+
+  // Helper: upload file to Supabase Storage and return public URL
+  const uploadToStorage = async (file, folder = 'products') => {
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    
+    const { data, error } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) throw error;
+    
+    const { data: urlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(data.path);
+    
+    return urlData.publicUrl;
+  };
+
+  const translateText = async (text, targetLang = 'pt') => {
+    if (!text) return '';
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return data[0].map(item => item[0]).join('');
+    } catch (err) {
+      console.error('Translation error:', err);
+      return text;
+    }
+  };
   const [bannerData, setBannerData] = useState({
     title: '', subtitle: '', cta: '', bgImg: '', color: 'from-amber-900/90 to-amber-800/40', badge: '', productId: ''
   });
 
+  const [pendingBannerFile, setPendingBannerFile] = useState(null);
   const handleBannerImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -317,6 +362,8 @@ function AdminPanel() {
         alert("¡Mba'e pio! La imagen pesa más de 2MB. Subí una más liviana rey.");
         return;
       }
+      setPendingBannerFile(file);
+      // Show local preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setBannerData({ ...bannerData, bgImg: reader.result });
@@ -327,22 +374,36 @@ function AdminPanel() {
 
   const handleBannerSave = async (e) => {
     e.preventDefault();
-    const payload = { ...bannerData };
-    if (payload.productId === '') payload.product_id = null;
-    else payload.product_id = payload.productId; 
-    delete payload.productId; 
-    
-    if (editingBannerId) {
-      const { data, error } = await supabase.from('banners').update(payload).eq('id', editingBannerId).select().single();
-      if (error) { alert("Error guardando el anuncio: " + error.message); return; }
-      if (data) setSlides(slides.map(b => b.id === editingBannerId ? { ...data, productId: data.product_id } : b));
-    } else {
-      const { data, error } = await supabase.from('banners').insert(payload).select().single();
-      if (error) { alert("Error al guardar anuncio: " + error.message); console.error(error); return; }
-      if (data) setSlides([{ ...data, productId: data.product_id }, ...slides]);
+    setUploadingBannerImage(true);
+    try {
+      const payload = { ...bannerData };
+      if (payload.productId === '') payload.product_id = null;
+      else payload.product_id = payload.productId; 
+      delete payload.productId; 
+      
+      // Upload image to Storage if there's a pending file
+      if (pendingBannerFile) {
+        const imageUrl = await uploadToStorage(pendingBannerFile, 'banners');
+        payload.bgImg = imageUrl;
+      }
+      
+      if (editingBannerId) {
+        const { data, error } = await supabase.from('banners').update(payload).eq('id', editingBannerId).select().single();
+        if (error) { alert("Error guardando el anuncio: " + error.message); return; }
+        if (data) setSlides(slides.map(b => b.id === editingBannerId ? { ...data, productId: data.product_id } : b));
+      } else {
+        const { data, error } = await supabase.from('banners').insert(payload).select().single();
+        if (error) { alert("Error al guardar anuncio: " + error.message); console.error(error); return; }
+        if (data) setSlides([{ ...data, productId: data.product_id }, ...slides]);
+      }
+      setBannerData({ title: '', subtitle: '', cta: '', bgImg: '', color: 'from-amber-900/90 to-amber-800/40', badge: '', productId: '' });
+      setEditingBannerId(null);
+      setPendingBannerFile(null);
+    } catch (err) {
+      alert('Error subiendo imagen: ' + err.message);
+    } finally {
+      setUploadingBannerImage(false);
     }
-    setBannerData({ title: '', subtitle: '', cta: '', bgImg: '', color: 'from-amber-900/90 to-amber-800/40', badge: '', productId: '' });
-    setEditingBannerId(null);
   };
   
   const handleBannerEdit = (b) => {
@@ -386,6 +447,7 @@ function AdminPanel() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const [pendingProductFile, setPendingProductFile] = useState(null);
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -393,6 +455,8 @@ function AdminPanel() {
         alert("¡Mba'e pio! La imagen pesa más de 2MB. Subí una más liviana rey.");
         return;
       }
+      setPendingProductFile(file);
+      // Show local preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData({ ...formData, image: reader.result });
@@ -423,17 +487,37 @@ function AdminPanel() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (editingId) {
-      const { data, error } = await supabase.from('products').update(formData).eq('id', editingId).select().single();
-      if (error) { alert("Error guardando producto: " + error.message); return; }
-      if (data) setProducts(products.map(p => p.id === editingId ? data : p));
-    } else {
-      const { data, error } = await supabase.from('products').insert(formData).select().single();
-      if (error) { alert("Error al guardar: " + error.message); return; }
-      if (data) setProducts([data, ...products]);
+    setIsSaving(true);
+    try {
+      // Auto translate text to Portuguese
+      const payload = { ...formData };
+      if (payload.name) payload.name_pt = await translateText(payload.name);
+      if (payload.desc) payload.desc_pt = await translateText(payload.desc);
+      if (payload.features) payload.features_pt = await translateText(payload.features);
+
+      // Upload image to Storage if there's a pending file
+      if (pendingProductFile) {
+        const imageUrl = await uploadToStorage(pendingProductFile, 'products');
+        payload.image = imageUrl;
+      }
+
+      if (editingId) {
+        const { data, error } = await supabase.from('products').update(payload).eq('id', editingId).select().single();
+        if (error) { alert("Error guardando producto: " + error.message); setIsSaving(false); return; }
+        if (data) setProducts(products.map(p => p.id === editingId ? data : p));
+      } else {
+        const { data, error } = await supabase.from('products').insert(payload).select().single();
+        if (error) { alert("Error al guardar: " + error.message); setIsSaving(false); return; }
+        if (data) setProducts([data, ...products]);
+      }
+      setFormData({ name: '', brand: '', category: '', desc: '', price: '', price_brl: '', image: '', badge: '', shipping_title: '', shipping_desc: '', features: '' });
+      setEditingId(null);
+      setPendingProductFile(null);
+    } catch (err) {
+      alert('Error subiendo imagen: ' + err.message);
+    } finally {
+      setIsSaving(false);
     }
-    setFormData({ name: '', brand: '', category: '', desc: '', price: '', price_brl: '', image: '', badge: '', shipping_title: '', shipping_desc: '', features: '' });
-    setEditingId(null);
   };
 
   const handleCancelNew = () => {
@@ -805,7 +889,7 @@ function AdminPanel() {
 }
 
 function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavorite, onToggleFavorite }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { products } = React.useContext(ProductContext);
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
 
@@ -860,7 +944,7 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
           </div>
           
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 leading-[1.1] mb-4 tracking-tight">
-            {product.name}
+            {i18n.language === 'pt' && product.name_pt ? product.name_pt : product.name}
           </h1>
 
           <div className="flex items-center gap-3 mb-6 bg-amber-50/50 w-fit px-3 py-1.5 rounded-xl border border-amber-100">
@@ -881,16 +965,18 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
             </span>
           </div>
 
-          <p className="text-base text-slate-500 mb-6 leading-relaxed font-medium">{t(product.desc)}</p>
+          <p className="text-base text-slate-500 mb-6 leading-relaxed font-medium">{i18n.language === 'pt' && product.desc_pt ? product.desc_pt : product.desc}</p>
 
           {/* Características */}
           <div className="mb-6 space-y-3">
             <h3 className="font-bold text-slate-800 text-base">{t("Beneficios_clave")}</h3>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(typeof product.features === 'string' ? product.features.split(',').map(s => s.trim()).filter(s => s) : (Array.isArray(product.features) ? product.features : [])).map((feat, idx) => (
+              {(typeof (i18n.language === 'pt' && product.features_pt ? product.features_pt : product.features) === 'string' 
+                  ? (i18n.language === 'pt' && product.features_pt ? product.features_pt : product.features).split(',').map(s => s.trim()).filter(s => s) 
+                  : (Array.isArray(product.features) ? product.features : [])).map((feat, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 text-sm">
                   <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
-                  <span className="font-medium">{t(feat)}</span>
+                  <span className="font-medium">{feat}</span>
                 </li>
               ))}
             </ul>
@@ -950,7 +1036,7 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
               </div>
               <div className="flex-1 flex flex-col">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{relProd.brand}</span>
-                <h3 className="text-xl font-bold text-slate-800 leading-tight mb-3 line-clamp-2">{t(relProd.name)}</h3>
+                <h3 className="text-xl font-bold text-slate-800 leading-tight mb-3 line-clamp-2">{i18n.language === 'pt' && relProd.name_pt ? relProd.name_pt : relProd.name}</h3>
                 <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
                   {relProd.price && <span className="text-2xl font-black text-teal-600">Gs. {relProd.price}</span>}
                   {relProd.price && relProd.price_brl && <span className="text-slate-300 mx-2 text-xl font-normal">|</span>}
@@ -1048,8 +1134,8 @@ function Navbar({ onSelectProduct, cartCount, favoritesCount, onOpenCart, onOpen
                       <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-xl shadow-sm group-hover/item:scale-105 transition-transform bg-slate-100" />
                       <div className="flex-1 min-w-0">
                         <div className="text-[10px] font-black text-teal-600 mb-0.5 uppercase tracking-widest">{product.brand}</div>
-                        <h4 className="font-bold text-slate-800 text-sm truncate">{t(product.name)}</h4>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{t(product.desc)}</p>
+                        <h4 className="font-bold text-slate-800 text-sm truncate">{i18n.language === 'pt' && product.name_pt ? product.name_pt : product.name}</h4>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{i18n.language === 'pt' && product.desc_pt ? product.desc_pt : product.desc}</p>
                       </div>
                       <div className="font-black text-teal-600 whitespace-nowrap bg-teal-50 px-3 py-1.5 rounded-xl">
                         {product.price ? `Gs. ${product.price}` : ''} 
@@ -1129,7 +1215,7 @@ function Navbar({ onSelectProduct, cartCount, favoritesCount, onOpenCart, onOpen
 }
 
 function HeroCarousel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { slides, products, setSelectedProduct } = React.useContext(ProductContext);
 
   const [current, setCurrent] = useState(0);
@@ -1222,7 +1308,7 @@ function HeroCarousel() {
 }
 
 function PopularCategories({ onSelectCategory }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const categories = [
     { name: "Cuidado Personal", icon: Sparkles, color: "text-purple-600", bg: "bg-purple-100", border: "hover:border-purple-200" },
     { name: "Vitaminas", icon: Pill, color: "text-amber-500", bg: "bg-amber-100", border: "hover:border-amber-200" },
@@ -1257,7 +1343,7 @@ function PopularCategories({ onSelectCategory }) {
 }
 
 function FeaturedProducts({ onSelectProduct, onAddToCart }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { products } = React.useContext(ProductContext);
   return (
     <section>
@@ -1300,8 +1386,8 @@ function FeaturedProducts({ onSelectProduct, onAddToCart }) {
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">
                 {product.brand}
               </span>
-              <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{t(product.name)}</h3>
-              <p className="text-sm text-slate-500 line-clamp-2 mb-4 font-medium">{t(product.desc)}</p>
+              <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{i18n.language === 'pt' && product.name_pt ? product.name_pt : product.name}</h3>
+              <p className="text-sm text-slate-500 line-clamp-2 mb-4 font-medium">{i18n.language === 'pt' && product.desc_pt ? product.desc_pt : product.desc}</p>
               
               <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                 <div className="flex flex-col">
@@ -1331,7 +1417,7 @@ function FeaturedProducts({ onSelectProduct, onAddToCart }) {
 }
 
 function CatalogCTA({ onOpenCatalog }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-500 text-white shadow-2xl mt-16 group">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 group-hover:opacity-20 transition-opacity duration-1000"></div>
@@ -1358,7 +1444,7 @@ function CatalogCTA({ onOpenCatalog }) {
 }
 
 function FullCatalog({ onSelectProduct, onAddToCart, onBack, initialCategory }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { products } = React.useContext(ProductContext);
   const [activeCategory, setActiveCategory] = useState(initialCategory || "Todas");
   
@@ -1443,8 +1529,8 @@ function FullCatalog({ onSelectProduct, onAddToCart, onBack, initialCategory }) 
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">
                 {product.brand}
               </span>
-              <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{t(product.name)}</h3>
-              <p className="text-sm text-slate-500 line-clamp-2 mb-4 font-medium">{t(product.desc)}</p>
+              <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{i18n.language === 'pt' && product.name_pt ? product.name_pt : product.name}</h3>
+              <p className="text-sm text-slate-500 line-clamp-2 mb-4 font-medium">{i18n.language === 'pt' && product.desc_pt ? product.desc_pt : product.desc}</p>
               
               <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                 <div className="flex flex-col">
@@ -1479,7 +1565,7 @@ function FullCatalog({ onSelectProduct, onAddToCart, onBack, initialCategory }) 
 }
 
 function TrustFooter({ onOpenPrivacy, onOpenTerms }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const features = [
     {
       icon: Truck,
@@ -1525,7 +1611,7 @@ function TrustFooter({ onOpenPrivacy, onOpenTerms }) {
             </span>
           </div>
           <p className="text-slate-400 text-sm md:text-base font-medium text-center">
-            © {new Date().getFullYear()} BodyLab. Cuidando tu salud con cariño.
+            © {new Date().getFullYear()} BodyLab. {t('Footer_Rights')}
           </p>
           <div className="flex gap-6">
             <button onClick={onOpenPrivacy} className="text-slate-400 hover:text-teal-600 transition-colors font-bold text-sm">{t("Privacidad")}</button>
@@ -1538,7 +1624,7 @@ function TrustFooter({ onOpenPrivacy, onOpenTerms }) {
 }
 
 function PrivacyPolicy({ onBack }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
       <button 
@@ -1617,7 +1703,7 @@ function PrivacyPolicy({ onBack }) {
 }
 
 function TermsAndConditions({ onBack }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
       <button 
@@ -1681,7 +1767,7 @@ function TermsAndConditions({ onBack }) {
 }
 
 function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [step, setStep] = useState('cart'); // 'cart' | 'checkout'
   const [formData, setFormData] = useState({
     nombre: '', apellidos: '', pais: 'Paraguay', direccion: '', ciudad: '', notas: '', telefono: ''
@@ -1761,7 +1847,7 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
     text += `*TOTAL A ABONAR: ${totalStrs.join(' | ')}*%0A`;
     text += `===================================%0A`;
 
-    window.open(`https://wa.me/595982351752?text=${text}`, '_blank');
+    window.open(`https://wa.me/5950986441200?text=${text}`, '_blank');
   };
 
   return (
@@ -1811,7 +1897,7 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50 px-2 py-1 rounded-lg mb-1 inline-block">{item.brand}</span>
-                      <h4 className="font-bold text-slate-800 text-lg truncate leading-tight">{t(item.name)}</h4>
+                      <h4 className="font-bold text-slate-800 text-lg truncate leading-tight">{i18n.language === 'pt' && item.name_pt ? item.name_pt : item.name}</h4>
                       <div className="flex items-center gap-3 mt-3">
                         <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl p-1 shrink-0 w-fit">
                           <button 
@@ -1843,8 +1929,8 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
                         <Trash2 className="w-5 h-5" />
                       </button>
                       <div className="font-black text-teal-600 text-xl whitespace-nowrap bg-teal-50 px-4 py-2 rounded-xl mt-2 grid text-right">
-                        {item.price && <span>Gs. {item.price}</span>}
-                        {item.price_brl && <span>R$ {item.price_brl}</span>}
+                        {item.price && <span className="text-xl">Gs. {item.price}</span>}
+                        {item.price_brl && <span className="text-xl">R$ {item.price_brl}</span>}
                       </div>
                     </div>
                   </li>
@@ -1909,7 +1995,7 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
                   <span className="text-xl font-bold text-slate-600 uppercase tracking-tight">{t("Total_pagar")}</span>
                   <span className="flex flex-col items-end text-3xl font-black text-teal-600 tracking-tight leading-none text-right">
                     {totalGs > 0 && <span><span className="text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{formattedTotalGs}</span>}
-                    {totalBrl > 0 && <span className="text-xl mt-1"><span className="text-base text-teal-500 font-bold align-top mr-1">R$</span>{formattedTotalBrl}</span>}
+                    {totalBrl > 0 && <span className="mt-1"><span className="text-xl text-teal-500 font-bold align-top mr-1">R$</span>{formattedTotalBrl}</span>}
                   </span>
                 </div>
                 <button 
@@ -1935,7 +2021,7 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
 }
 
 function FavoritesPage({ items, onSelectProduct, onAddToCart, onRemove, onBack }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in slide-in-from-bottom-8 fade-in duration-500">
       <button 
@@ -2000,7 +2086,7 @@ function FavoritesPage({ items, onSelectProduct, onAddToCart, onRemove, onBack }
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   {product.brand}
                 </span>
-                <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{t(product.name)}</h3>
+                <h3 className="text-xl font-bold text-slate-800 leading-tight mb-2 line-clamp-2">{i18n.language === 'pt' && product.name_pt ? product.name_pt : product.name}</h3>
                 
                 <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                   <span className="text-2xl font-black text-teal-600">
@@ -2029,7 +2115,7 @@ function FavoritesPage({ items, onSelectProduct, onAddToCart, onRemove, onBack }
 }
 
 function ReviewsModal({ product, onClose }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState('list'); // 'list' | 'warning' | 'profile' | 'write'
   const { reviews, setReviews } = React.useContext(ProductContext);
   const productReviews = reviews.filter(r => r.productId === product.id);

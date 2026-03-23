@@ -128,7 +128,11 @@ const resources = {
       "Mamá y Bebé": "Mamá y Bebé",
       "Dermocosmética": "Dermocosmética",
       "Primeros Auxilios": "Primeros Auxilios",
-      "Todas": "Todas"
+      "Todas": "Todas",
+      "Footer_Rights": "Cuidando tu salud con cariño.", "Footer_Rights": "Cuidando tu salud con cariño.",
+      "Footer_Rights": "Cuidando tu salud con cariño.", "Footer_Rights": "Cuidando tu salud con cariño.",
+      "Footer_Rights": "Cuidando tu salud con cariño.", "Footer_Rights": "Cuidando tu salud con cariño.",
+      "Footer_Rights": "Cuidando tu salud con cariño.", "Footer_Rights": "Cuidando tu salud con cariño."
     }
   },
   pt: {
@@ -257,7 +261,11 @@ const resources = {
       "Mamá y Bebé": "Mamãe e Bebê",
       "Dermocosmética": "Dermocosméticos",
       "Primeros Auxilios": "Primeiros Socorros",
-      "Todas": "Todas"
+      "Todas": "Todas",
+      "Footer_Rights": "Cuidando da sua saúde com carinho.",
+      "Footer_Rights": "Cuidando da sua saúde com carinho.",
+      "Footer_Rights": "Cuidando da sua saúde com carinho.",
+      "Footer_Rights": "Cuidando da sua saúde com carinho."
     }
   }
 };
