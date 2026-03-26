@@ -43,6 +43,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [slides, setSlides] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [cotizacion, setCotizacion] = useState(1400);
 
   useEffect(() => {
     async function loadData() {
@@ -52,6 +53,8 @@ export default function App() {
       if (bals) setSlides(bals.map(b => ({ ...b, productId: b.product_id })));
       const { data: revs } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
       if (revs) setReviews(revs);
+      const { data: sets } = await supabase.from('settings').select('*').eq('key', 'cotizacion_brl_pyg').single();
+      if (sets && sets.value) setCotizacion(parseFloat(sets.value));
     }
     loadData();
   }, []);
@@ -169,7 +172,7 @@ export default function App() {
   };
 
   return (
-    <ProductContext.Provider value={{ products, setProducts, slides, setSlides, reviews, setReviews, setSelectedProduct, setAdminModalOpen }}>
+    <ProductContext.Provider value={{ products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen }}>
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-teal-200 selection:text-teal-900 flex flex-col">
       <Navbar 
         onSelectProduct={handleSelectProduct} 
@@ -291,6 +294,20 @@ export default function App() {
            </div>
         </div>
       )}
+      {/* Botón Flotante Whatsapp */}
+      <a 
+        href="https://wa.me/5950986441200" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="fixed bottom-6 right-6 z-[100] bg-green-500 text-white px-5 py-3 rounded-full shadow-2xl shadow-green-500/30 hover:bg-green-600 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2 animate-in slide-in-from-bottom border-[3px] border-white"
+        title="Contactar por WhatsApp"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+        <span className="font-bold text-[15px] tracking-wide">Contacto Directo</span>
+      </a>
+
     </div>
   </ProductContext.Provider>
   );
@@ -298,7 +315,7 @@ export default function App() {
 
 
 function AdminPanel() {
-  const { products, setProducts, slides, setSlides, reviews, setReviews, setSelectedProduct, setAdminModalOpen } = React.useContext(ProductContext);
+  const { products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen } = React.useContext(ProductContext);
   const [activeTab, setActiveTab] = useState('products');
   
   // Reseñas Modal State
@@ -440,7 +457,10 @@ function AdminPanel() {
   };
 
   const handleBrlPriceChange = (e) => {
-    setFormData({ ...formData, price_brl: formatBrlPrice(e.target.value) });
+    const newVal = formatBrlPrice(e.target.value);
+    const numBrl = parseFloat(newVal.replace(/\./g, '').replace(',', '.')) || 0;
+    const calcGs = Math.round(numBrl * cotizacion);
+    setFormData({ ...formData, price_brl: newVal, price: formatPrice(calcGs.toString()) });
   };
 
   const handleChange = (e) => {
@@ -531,6 +551,7 @@ function AdminPanel() {
          <button onClick={() => setActiveTab('products')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Inventario de Productos</button>
          <button onClick={() => setActiveTab('banners')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'banners' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Anuncios y Carrusel</button>
          <button onClick={() => setActiveTab('reviews')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'reviews' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Control de Reseñas</button>
+         <button onClick={() => setActiveTab('settings')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Cotización</button>
       </div>
       
       {activeTab === 'products' && (
@@ -567,15 +588,15 @@ function AdminPanel() {
               <textarea name="shipping_desc" value={formData.shipping_desc} onChange={handleChange} rows="2" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Ej: Llega hoy si compras antes de las 18:00hs."></textarea>
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Categoría</label>
-              <select required name="category" value={formData.category} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400">
-                <option value="">Seleccionar...</option>
-                <option value="Vitaminas">Vitaminas</option>
-                <option value="Cuidado Personal">Cuidado Personal</option>
-                <option value="Dermocosmética">Dermocosmética</option>
-                <option value="Mamá y Bebé">Mamá y Bebé</option>
-                <option value="Primeros Auxilios">Primeros Auxilios</option>
-              </select>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Categoría (Manual o Elección Rápida)</label>
+              <div className="flex gap-2 mb-2 flex-wrap">
+                {['Anabólicos', 'Emagrecedores', 'Medicamentos'].map(cat => (
+                  <button type="button" key={cat} onClick={() => setFormData({...formData, category: cat})} className={`px-3 py-1 border rounded-lg text-xs font-bold transition-colors ${formData.category === cat ? 'bg-teal-600 text-white border-teal-600' : 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100'}`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <input required name="category" value={formData.category} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400" placeholder="Escribir categoría..." />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Descripción</label>
@@ -850,6 +871,35 @@ function AdminPanel() {
       </div>
       )}
 
+      {activeTab === 'settings' && (
+      <div className="flex flex-col gap-8 w-full">
+         <div className="w-full max-w-md mx-auto">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center">
+               <h4 className="text-xl font-black text-slate-800 mb-6 flex justify-center items-center gap-2">
+                 Cotización Constante (Real a Guaraní)
+               </h4>
+               <p className="text-sm text-slate-500 mb-4">Cargá a cuánto tomás 1 Real (R$) en Guaraníes (Gs):</p>
+               <input 
+                 type="number" 
+                 value={cotizacion} 
+                 onChange={(e) => setCotizacion(parseFloat(e.target.value) || 0)} 
+                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-teal-400 font-bold text-teal-600 text-center text-xl mb-4" 
+               />
+               <button 
+                 onClick={async () => {
+                   const { error } = await supabase.from('settings').update({ value: cotizacion.toString() }).eq('key', 'cotizacion_brl_pyg');
+                   if(error) alert('Error guardando cotización');
+                   else alert('¡Cotización guardada pai!');
+                 }} 
+                 className="w-full p-4 rounded-xl font-black text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
+               >
+                 Guardar Cotización
+               </button>
+            </div>
+         </div>
+      </div>
+      )}
+
       {/* Modal para Contestar */}
       {replyingToReview && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -986,10 +1036,13 @@ function ProductDetails({ product, onBack, onSelectRelated, onAddToCart, isFavor
             <div className="flex flex-col w-full sm:w-auto min-w-[140px]">
               <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">{t("Precio_Final")}</span>
               <span className="text-4xl font-black text-teal-600 tracking-tight">
-                {product.price && <><span className="text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{product.price}</>}
-                {product.price && product.price_brl && <span className="text-slate-300 mx-3 font-normal">|</span>}
                 {product.price_brl && <><span className="text-xl text-teal-500 font-bold align-top mr-1">R$</span>{product.price_brl}</>}
               </span>
+              {product.price && (
+                <span className="text-sm font-bold text-slate-500 mt-1">
+                  Gs. {product.price}
+                </span>
+              )}
             </div>
             <button 
               onClick={() => onAddToCart(product)}
@@ -1308,14 +1361,23 @@ function HeroCarousel() {
 }
 
 function PopularCategories({ onSelectCategory }) {
-  const { t, i18n } = useTranslation();
-  const categories = [
-    { name: "Cuidado Personal", icon: Sparkles, color: "text-purple-600", bg: "bg-purple-100", border: "hover:border-purple-200" },
-    { name: "Vitaminas", icon: Pill, color: "text-amber-500", bg: "bg-amber-100", border: "hover:border-amber-200" },
-    { name: "Mamá y Bebé", icon: Baby, color: "text-rose-500", bg: "bg-rose-100", border: "hover:border-rose-200" },
-    { name: "Dermocosmética", icon: HeartPulse, color: "text-pink-500", bg: "bg-pink-100", border: "hover:border-pink-200" },
-    { name: "Primeros Auxilios", icon: ShieldCheck, color: "text-teal-600", bg: "bg-teal-100", border: "hover:border-teal-200" },
+  const { t } = useTranslation();
+  const { products } = React.useContext(ProductContext);
+  
+  const defaultStyles = [
+    { icon: Sparkles, color: "text-purple-600", bg: "bg-purple-100", border: "hover:border-purple-200" },
+    { icon: Pill, color: "text-amber-500", bg: "bg-amber-100", border: "hover:border-amber-200" },
+    { icon: Baby, color: "text-rose-500", bg: "bg-rose-100", border: "hover:border-rose-200" },
+    { icon: HeartPulse, color: "text-pink-500", bg: "bg-pink-100", border: "hover:border-pink-200" },
+    { icon: ShieldCheck, color: "text-teal-600", bg: "bg-teal-100", border: "hover:border-teal-200" },
   ];
+
+  const uniqueCategories = [...new Set(products.map(p => p.category))].filter(Boolean);
+  
+  const dynamicCategories = uniqueCategories.map((name, idx) => {
+    const style = defaultStyles[idx % defaultStyles.length];
+    return { name, ...style };
+  });
 
   return (
     <section>
@@ -1323,7 +1385,9 @@ function PopularCategories({ onSelectCategory }) {
         <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t("Categorias_Populares")}</h2>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-        {categories.map((cat, idx) => (
+        {dynamicCategories.length === 0 ? (
+          <p className="text-slate-400 font-bold col-span-full text-center py-10">Agregá productos para ver las categorías.</p>
+        ) : dynamicCategories.map((cat, idx) => (
           <div 
             key={idx}
             onClick={() => onSelectCategory && onSelectCategory(cat.name)}
@@ -1393,10 +1457,13 @@ function FeaturedProducts({ onSelectProduct, onAddToCart }) {
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">{t("Precio")}</span>
                   <span className="text-2xl font-black text-teal-600">
-                    {product.price ? `Gs. ${product.price}` : ''} 
-                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
-                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
+                    {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
+                  {product.price && (
+                    <span className="text-xs font-bold text-slate-500 mt-1">
+                      Gs. {product.price}
+                    </span>
+                  )}
                 </div>
                 <button 
                   onClick={(e) => { 
@@ -1536,10 +1603,13 @@ function FullCatalog({ onSelectProduct, onAddToCart, onBack, initialCategory }) 
                 <div className="flex flex-col">
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">{t("Precio")}</span>
                   <span className="text-2xl font-black text-teal-600">
-                    {product.price ? `Gs. ${product.price}` : ''} 
-                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
-                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
+                    {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
+                  {product.price && (
+                    <span className="text-xs font-bold text-slate-500 mt-1">
+                      Gs. {product.price}
+                    </span>
+                  )}
                 </div>
                 <button 
                   onClick={(e) => { 
@@ -2090,10 +2160,13 @@ function FavoritesPage({ items, onSelectProduct, onAddToCart, onRemove, onBack }
                 
                 <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                   <span className="text-2xl font-black text-teal-600">
-                    {product.price ? `Gs. ${product.price}` : ''} 
-                            {product.price && product.price_brl ? <span className="text-slate-300 mx-1 font-normal">|</span> : ''} 
-                            {product.price_brl ? `R$ ${product.price_brl}` : ''}
+                    {product.price_brl ? `R$ ${product.price_brl}` : ''}
                   </span>
+                  {product.price && (
+                    <span className="text-xs font-bold text-slate-500 mt-1">
+                      Gs. {product.price}
+                    </span>
+                  )}
                   <button 
                     onClick={(e) => { 
                       e.stopPropagation(); 
@@ -2407,22 +2480,17 @@ function ReviewsModal({ product, onClose }) {
     </div>
   );
 }
-function PriceInputContainer({ formData, handlePriceChange, handleBrlPriceChange }) {
-  const [currency, setCurrency] = useState('GS');
+function PriceInputContainer({ formData, handleBrlPriceChange }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-1">
-        <label className="block text-sm font-bold text-slate-700">Precio</label>
-        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-          <button type="button" onClick={() => setCurrency('GS')} className={`px-2 py-1 flex-1 text-[10px] uppercase font-bold rounded-md transition-all ${currency === 'GS' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>Gs.</button>
-          <button type="button" onClick={() => setCurrency('BRL')} className={`px-2 py-1 flex-1 text-[10px] uppercase font-bold rounded-md transition-all ${currency === 'BRL' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>R$</button>
-        </div>
+        <label className="block text-sm font-bold text-slate-700">Precio (R$)</label>
       </div>
-      {currency === 'GS' ? (
-        <input required value={formData.price} onChange={handlePriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="1.000" />
-      ) : (
-        <input required value={formData.price_brl} onChange={handleBrlPriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600" placeholder="0,00" />
-      )}
+      <input required value={formData.price_brl} onChange={handleBrlPriceChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-teal-400 font-bold text-teal-600 mb-2" placeholder="0,00" />
+      <div className="flex justify-between items-center bg-slate-100 p-2 rounded-lg">
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Calculado en GS:</span>
+        <span className="text-sm font-black text-teal-700">Gs. {formData.price || '0'}</span>
+      </div>
     </div>
   );
 }
