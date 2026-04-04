@@ -44,6 +44,7 @@ export default function App() {
   const [slides, setSlides] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [cotizacion, setCotizacion] = useState(1400);
+  const [siteLogo, setSiteLogo] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -52,11 +53,36 @@ export default function App() {
       const { data: bals } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
       if (bals) setSlides(bals.map(b => ({ ...b, productId: b.product_id })));
       const { data: revs } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
-      if (revs) setReviews(revs);
-      const { data: sets } = await supabase.from('settings').select('*').eq('key', 'cotizacion_brl_pyg').single();
-      if (sets && sets.value) setCotizacion(parseFloat(sets.value));
+      if (revs) setReviews(revs.map(r => ({ ...r, productId: r.product_id, adminReply: r.admin_reply })));
+      const { data: sets } = await supabase.from('settings').select('*');
+      if (sets) {
+        const coti = sets.find(s => s.key === 'cotizacion_brl_pyg');
+        if (coti && coti.value) setCotizacion(parseFloat(coti.value));
+        const logoSet = sets.find(s => s.key === 'site_logo');
+        if (logoSet && logoSet.value) setSiteLogo(logoSet.value);
+      }
     }
     loadData();
+
+    // Suscripción a Reseñas en Tiempo Real
+    const reviewsSubscription = supabase
+      .channel('custom-all-channel-reviews')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newRev = { ...payload.new, productId: payload.new.product_id, adminReply: payload.new.admin_reply };
+          setReviews(prev => [newRev, ...prev]);
+        } else if (payload.eventType === 'DELETE') {
+          setReviews(prev => prev.filter(r => r.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedRev = { ...payload.new, productId: payload.new.product_id, adminReply: payload.new.admin_reply };
+          setReviews(prev => prev.map(r => r.id === payload.new.id ? updatedRev : r));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reviewsSubscription);
+    };
   }, []);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -172,7 +198,7 @@ export default function App() {
   };
 
   return (
-    <ProductContext.Provider value={{ products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen }}>
+    <ProductContext.Provider value={{ products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen, siteLogo, setSiteLogo }}>
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-teal-200 selection:text-teal-900 flex flex-col">
       <Navbar 
         onSelectProduct={handleSelectProduct} 
@@ -315,12 +341,16 @@ export default function App() {
 
 
 function AdminPanel() {
-  const { products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen } = React.useContext(ProductContext);
+  const { products, setProducts, slides, setSlides, reviews, setReviews, cotizacion, setCotizacion, setSelectedProduct, setAdminModalOpen, siteLogo, setSiteLogo } = React.useContext(ProductContext);
   const [activeTab, setActiveTab] = useState('products');
   
   // Reseñas Modal State
   const [replyingToReview, setReplyingToReview] = useState(null);
   const [replyText, setReplyText] = useState('');
+
+  // Logo state
+  const [pendingLogoFile, setPendingLogoFile] = useState(null);
+  const [pendingLogoPreview, setPendingLogoPreview] = useState(null);
 
   // Products state
   const [editingId, setEditingId] = useState(null);
@@ -355,16 +385,27 @@ function AdminPanel() {
     return urlData.publicUrl;
   };
 
-  const translateText = async (text, targetLang = 'pt') => {
-    if (!text) return '';
+  const handleTranslations = async (text) => {
+    if (!text) return { es: '', pt: '' };
     try {
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pt&dt=t&q=${encodeURIComponent(text)}`;
       const res = await fetch(url);
       const data = await res.json();
-      return data[0].map(item => item[0]).join('');
+      const translatedToPt = data[0].map(item => item[0]).join('');
+      const detectedLang = data[2]; 
+      
+      if (detectedLang === 'pt') {
+        const urlEs = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=pt&tl=es&dt=t&q=${encodeURIComponent(text)}`;
+        const resEs = await fetch(urlEs);
+        const dataEs = await resEs.json();
+        const translatedToEs = dataEs[0].map(item => item[0]).join('');
+        return { es: translatedToEs, pt: text };
+      }
+      
+      return { es: text, pt: translatedToPt };
     } catch (err) {
       console.error('Translation error:', err);
-      return text;
+      return { es: text, pt: text };
     }
   };
   const [bannerData, setBannerData] = useState({
@@ -509,11 +550,20 @@ function AdminPanel() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      // Auto translate text to Portuguese
+      // Auto translate text to Portuguese and Spanish automatically by detecting input
       const payload = { ...formData };
-      if (payload.name) payload.name_pt = await translateText(payload.name);
-      if (payload.desc) payload.desc_pt = await translateText(payload.desc);
-      if (payload.features) payload.features_pt = await translateText(payload.features);
+      if (payload.name) {
+        const t = await handleTranslations(payload.name);
+        payload.name = t.es; payload.name_pt = t.pt;
+      }
+      if (payload.desc) {
+        const t = await handleTranslations(payload.desc);
+        payload.desc = t.es; payload.desc_pt = t.pt;
+      }
+      if (payload.features) {
+        const t = await handleTranslations(payload.features);
+        payload.features = t.es; payload.features_pt = t.pt;
+      }
 
       // Upload image to Storage if there's a pending file
       if (pendingProductFile) {
@@ -547,10 +597,11 @@ function AdminPanel() {
 
   return (
     <div className="w-full flex flex-col gap-6">
-      <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl w-fit">
+      <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl w-fit flex-wrap">
          <button onClick={() => setActiveTab('products')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Inventario de Productos</button>
          <button onClick={() => setActiveTab('banners')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'banners' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Anuncios y Carrusel</button>
          <button onClick={() => setActiveTab('reviews')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'reviews' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Control de Reseñas</button>
+         <button onClick={() => setActiveTab('logo')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'logo' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Control de Logomarca</button>
          <button onClick={() => setActiveTab('settings')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>Cotización</button>
       </div>
       
@@ -900,6 +951,95 @@ function AdminPanel() {
       </div>
       )}
 
+      {activeTab === 'logo' && (
+      <div className="flex flex-col gap-8 w-full">
+         <div className="w-full max-w-md mx-auto">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center">
+               <h4 className="text-xl font-black text-slate-800 mb-4 flex justify-center items-center gap-2">
+                 Logo del Sitio
+               </h4>
+               <p className="text-sm text-slate-500 mb-6">Subí tu logo acá y se va a actualizar en toda la página.</p>
+               <div className="mb-8 w-full mt-4">
+                  <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 text-left pl-2">Vista Previa en el Navbar</h5>
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex items-center gap-4 justify-between relative overflow-hidden">
+                     <div className="absolute inset-x-0 top-0 h-1/2 bg-slate-50/50"></div>
+                     <div className="flex items-center gap-2 relative z-10">
+                        {pendingLogoPreview || siteLogo ? (
+                           <img src={pendingLogoPreview || siteLogo} alt="Logo Preview" className="h-[42px] object-contain" />
+                        ) : (
+                           <div className="bg-teal-100 p-2 rounded-xl">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-heart-pulse w-8 h-8 text-teal-600"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>
+                           </div>
+                        )}
+                        <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-500 tracking-tight">
+                          BodyLab
+                        </span>
+                     </div>
+                     <div className="flex-1 max-w-[150px] bg-slate-100 h-10 rounded-xl"></div>
+                     <div className="w-10 h-10 bg-slate-100 rounded-xl hidden sm:block"></div>
+                     <div className="w-10 h-10 bg-slate-100 rounded-xl hidden sm:block"></div>
+                  </div>
+               </div>
+               <div className="flex flex-col items-center gap-2">
+                 <input 
+                   type="file" 
+                   accept="image/*" 
+                   onChange={(e) => {
+                     const file = e.target.files[0];
+                     if(file) {
+                       setPendingLogoFile(file);
+                       const reader = new FileReader();
+                       reader.onloadend = () => {
+                         setPendingLogoPreview(reader.result);
+                       };
+                       reader.readAsDataURL(file);
+                     } else {
+                       setPendingLogoFile(null);
+                       setPendingLogoPreview(null);
+                     }
+                   }} 
+                   className="w-full text-sm text-slate-500 file:mr-3 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-black file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200 transition-all cursor-pointer outline-none mx-auto block bg-slate-50 rounded-2xl p-2 border border-slate-100" 
+                 />
+                 <button 
+                   onClick={async () => {
+                     if(!pendingLogoFile) {
+                       alert('No elegiste ninguna foto nueva rey.');
+                       return;
+                     }
+                     try {
+                       const fileExt = pendingLogoFile.name.split('.').pop().toLowerCase();
+                       const fileName = `logos/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+                       const { data, error } = await supabase.storage.from('product-images').upload(fileName, pendingLogoFile, { cacheControl: '3600', upsert: false });
+                       if (error) throw error;
+                       const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(data.path);
+                       const imgUrl = urlData.publicUrl;
+                       
+                       const { data: setRow } = await supabase.from('settings').select('*').eq('key', 'site_logo').single();
+                       if (setRow) {
+                         await supabase.from('settings').update({ value: imgUrl }).eq('key', 'site_logo');
+                       } else {
+                         await supabase.from('settings').insert({ key: 'site_logo', value: imgUrl });
+                       }
+                       setSiteLogo(imgUrl);
+                       setPendingLogoFile(null);
+                       setPendingLogoPreview(null);
+                       alert('¡Logo aplicado con éxito!');
+                     } catch (err) {
+                       alert('Falló el upload: ' + err.message);
+                     }
+                   }}
+                   disabled={!pendingLogoFile}
+                   className={`w-full p-4 mt-2 rounded-xl font-black text-white transition-colors shadow-sm ${pendingLogoFile ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-300 cursor-not-allowed'}`}
+                 >
+                   Aplicar y Guardar Logo
+                 </button>
+                 <p className="text-xs text-slate-400 mt-3">Formatos soportados: PNG, JPG, WEBP. Mejor si tiene fondo transparente.</p>
+               </div>
+            </div>
+         </div>
+      </div>
+      )}
+
       {/* Modal para Contestar */}
       {replyingToReview && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -1118,7 +1258,7 @@ function Navbar({ onSelectProduct, cartCount, favoritesCount, onOpenCart, onOpen
   const [showResults, setShowResults] = useState(false);
   
   const { t, i18n } = useTranslation();
-  const { products } = React.useContext(ProductContext);
+  const { products, siteLogo } = React.useContext(ProductContext);
   const [langOpen, setLangOpen] = useState(false);
   const currentLang = i18n.language;
 
@@ -1149,9 +1289,13 @@ function Navbar({ onSelectProduct, cartCount, favoritesCount, onOpenCart, onOpen
         
         {/* Logo */}
         <div className="flex items-center gap-2 cursor-pointer group" onClick={onGoHome}>
-          <div className="bg-teal-100 p-2 rounded-xl group-hover:bg-teal-200 transition-colors">
-            <HeartPulse className="w-8 h-8 text-teal-600" />
-          </div>
+          {siteLogo ? (
+            <img src={siteLogo} alt="Logo" className="h-[42px] object-contain hover:scale-105 transition-transform" />
+          ) : (
+            <div className="bg-teal-100 p-2 rounded-xl group-hover:bg-teal-200 transition-colors">
+              <HeartPulse className="w-8 h-8 text-teal-600" />
+            </div>
+          )}
           <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-500 tracking-tight">
             BodyLab
           </span>
@@ -1998,9 +2142,9 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
-                      <div className="font-black text-teal-600 text-xl whitespace-nowrap bg-teal-50 px-4 py-2 rounded-xl mt-2 grid text-right">
-                        {item.price && <span className="text-xl">Gs. {item.price}</span>}
-                        {item.price_brl && <span className="text-xl">R$ {item.price_brl}</span>}
+                      <div className="font-black text-teal-600 text-base sm:text-xl whitespace-nowrap bg-teal-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl mt-2 grid text-right">
+                        {item.price && <span>Gs. {item.price}</span>}
+                        {item.price_brl && <span>R$ {item.price_brl}</span>}
                       </div>
                     </div>
                   </li>
@@ -2063,9 +2207,9 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
               <>
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-xl font-bold text-slate-600 uppercase tracking-tight">{t("Total_pagar")}</span>
-                  <span className="flex flex-col items-end text-3xl font-black text-teal-600 tracking-tight leading-none text-right">
-                    {totalGs > 0 && <span><span className="text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{formattedTotalGs}</span>}
-                    {totalBrl > 0 && <span className="mt-1"><span className="text-xl text-teal-500 font-bold align-top mr-1">R$</span>{formattedTotalBrl}</span>}
+                  <span className="flex flex-col items-end text-2xl sm:text-3xl font-black text-teal-600 tracking-tight leading-none text-right">
+                    {totalGs > 0 && <span><span className="text-base sm:text-xl text-teal-500 font-bold align-top mr-1">Gs.</span>{formattedTotalGs}</span>}
+                    {totalBrl > 0 && <span className="mt-1 sm:mt-1"><span className="text-base sm:text-xl text-teal-500 font-bold align-top mr-1">R$</span>{formattedTotalBrl}</span>}
                   </span>
                 </div>
                 <button 
@@ -2216,7 +2360,7 @@ function ReviewsModal({ product, onClose }) {
     setView('write');
   };
 
-  const handleReviewSubmit = (e) => {
+  const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!reviewForm.text) return;
 
@@ -2228,15 +2372,23 @@ function ReviewsModal({ product, onClose }) {
     }
 
     const newReview = {
-      id: Date.now(),
-      productId: product.id,
+      product_id: product.id,
       author: `${userProfile.nombre} ${userProfile.apellido}`,
-      avatar: userProfile.avatar,
+      // No guardamos el base64 del avatar en Supabase (muy pesado), solo en localStorage
       rating: reviewForm.rating,
-      date: "Ahora",
       text: reviewForm.text
     };
-    setReviews([newReview, ...reviews]);
+    
+    // Insert en Supabase para que el Realtime haga la magia
+    console.log("📝 Insertando reseña en Supabase:", newReview);
+    const { data: insertedData, error } = await supabase.from('reviews').insert(newReview).select();
+    if (error) {
+      console.error("❌ Error Supabase al guardar reseña:", error);
+      alert("Che rey, hubo un error guardando tu reseña: " + error.message);
+      return;
+    }
+    console.log("✅ Reseña guardada en Supabase:", insertedData);
+
     setView('list');
     setReviewForm({ rating: 5, text: '' });
   };
