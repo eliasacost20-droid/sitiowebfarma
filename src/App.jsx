@@ -1998,18 +1998,21 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
       return;
     }
     setGettingLocation(true);
+    const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
     navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude } = position.coords;
+      const { latitude, longitude, accuracy } = position.coords;
+      
+      // Si la precisión es mayor a 300 metros, probablemente está usando WiFi o IP (típico en PC de escritorio)
+      if (accuracy > 300) {
+         alert(`Aviso: Tu señal GPS es débil o estás en una PC de escritorio (precisión de ${Math.round(accuracy)}m). La ubicación enviada no será 100% exacta.`);
+      }
+      
       setLocationLink(`https://maps.google.com/?q=${latitude},${longitude}`);
       setGettingLocation(false);
     }, (error) => {
-      alert("No pudimos obtener tu ubicación automáticamente. Revisa los permisos.");
+      alert("No pudimos obtener tu ubicación exacta. Asegurate de tener el GPS encendido (Ubicación) y de darle permiso al navegador.");
       setGettingLocation(false);
-    }, {
-      enableHighAccuracy: true, // Fuerza a usar el GPS real del celular en vez de la antena
-      timeout: 10000,
-      maximumAge: 0
-    });
+    }, options);
   };
 
   const totalGs = items.reduce((acc, item) => {
