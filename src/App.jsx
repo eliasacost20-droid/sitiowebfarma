@@ -2054,16 +2054,14 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
 
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrSessionId, setQrSessionId] = useState(null);
+  const [qrSuccess, setQrSuccess] = useState(false);
 
   const handleGetLocation = async () => {
-    // Generar session ID único
+    setQrSuccess(false);
     const sid = Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
     setQrSessionId(sid);
-
-    // Crear la sesión en Supabase
     await supabase.from('gps_sessions').insert({ session_id: sid, status: 'pending' });
 
-    // Escuchar en Realtime hasta recibir la ubicación del celu
     const channel = supabase
       .channel('gps-' + sid)
       .on('postgres_changes', {
@@ -2075,8 +2073,12 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
         if (payload.new.status === 'received') {
           const { latitude, longitude } = payload.new;
           setLocationLink(`https://maps.google.com/?q=${latitude},${longitude}`);
-          setQrModalOpen(false);
-          setQrSessionId(null);
+          setQrSuccess(true);
+          setTimeout(() => {
+            setQrModalOpen(false);
+            setQrSessionId(null);
+            setQrSuccess(false);
+          }, 2200);
           supabase.removeChannel(channel);
         }
       })
@@ -2306,37 +2308,59 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
       {/* Modal QR GPS */}
       {qrModalOpen && qrSessionId && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center gap-5 border border-slate-100 animate-in zoom-in-95 duration-300 relative">
-            <button
-              onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="bg-teal-50 p-4 rounded-2xl">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="12" x="2" y="6" rx="1"/><path d="M17.5 7 22 12l-4.5 5"/><path d="M14 12H22"/></svg>
-            </div>
-            <div className="text-center">
-              <h3 className="text-xl font-black text-slate-800">Escanear con tu celular</h3>
-              <p className="text-sm text-slate-500 mt-1">Tu celu tiene GPS real. Escaneá este código para enviar tu ubicación exacta.</p>
-            </div>
-            <div className="bg-white p-3 rounded-2xl border-2 border-teal-200 shadow-sm">
-              <QRCodeSVG
-                value={`${window.location.origin}/gps?s=${qrSessionId}`}
-                size={180}
-                fgColor="#0d9488"
-                level="M"
-              />
-            </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-xs text-slate-400 font-medium">La página se actualizará automáticamente una vez que escanees. El GPS es <span className="font-bold text-slate-600">opcional.</span></p>
-            </div>
-            <button
-              onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
-              className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors mt-1"
-            >
-              Omitir (continuar sin GPS)
-            </button>
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center gap-5 border border-slate-100 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+            
+            {/* Estado: ÉXITO */}
+            {qrSuccess ? (
+              <div className="flex flex-col items-center gap-4 py-4 animate-in zoom-in-95 duration-300">
+                <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center border-4 border-teal-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black text-teal-700">Ubicación recibida</p>
+                  <p className="text-sm text-slate-500 mt-1">El GPS fue sincronizado correctamente desde tu celular.</p>
+                </div>
+              </div>
+            ) : (
+              // Estado: ESPERANDO ESCANEO
+              <>
+                <button
+                  onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
+                  className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="bg-teal-50 p-4 rounded-2xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="12" x="2" y="6" rx="1"/><path d="M17.5 7 22 12l-4.5 5"/><path d="M14 12H22"/></svg>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-black text-slate-800">Escanear con tu celular</h3>
+                  <p className="text-sm text-slate-500 mt-1">Tu celu tiene GPS real. Escaneá este código para enviar tu ubicación exacta.</p>
+                </div>
+                <div className="bg-white p-3 rounded-2xl border-2 border-teal-200 shadow-sm relative">
+                  <QRCodeSVG
+                    value={`${window.location.origin}/gps?s=${qrSessionId}`}
+                    size={180}
+                    fgColor="#0d9488"
+                    level="M"
+                  />
+                </div>
+                {/* Indicador de escucha activa */}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+                  </span>
+                  <p className="text-xs text-slate-500 font-medium">Esperando tu celular...</p>
+                </div>
+                <button
+                  onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
+                  className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors"
+                >
+                  Omitir (continuar sin GPS)
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
