@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from './supabase';
 import { useTranslation } from 'react-i18next';
 import './i18n';
@@ -38,7 +39,62 @@ const initialSlidesData = [];
 const initialReviewsData = [];
 
 
+// Helper: detectar si estamos en la página de captura GPS del celular
+const isGpsPage = typeof window !== 'undefined' && window.location.pathname === '/gps';
+
+// Página que abre el celular al escanear el QR
+function GpsCapturePage() {
+  const [status, setStatus] = useState('idle'); // 'idle' | 'getting' | 'success' | 'error'
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('s');
+
+  const handleCapture = () => {
+    if (!navigator.geolocation || !sessionId) { setStatus('error'); return; }
+    setStatus('getting');
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      await supabase.from('gps_sessions')
+        .update({ latitude, longitude, accuracy, status: 'received' })
+        .eq('session_id', sessionId);
+      setStatus('success');
+    }, () => setStatus('error'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  };
+
+  useEffect(() => { if (sessionId) handleCapture(); }, [sessionId]);
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+      {status === 'getting' && (
+        <>
+          <div style={{ width: 64, height: 64, border: '6px solid #0d9488', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 24 }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ fontSize: 20, fontWeight: 700, color: '#334155' }}>Obteniendo tu ubicación exacta...</p>
+          <p style={{ color: '#64748b', marginTop: 8 }}>Asegurate de tener el GPS activado en tu celu 📡</p>
+        </>
+      )}
+      {status === 'success' && (
+        <>
+          <div style={{ width: 80, height: 80, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, fontSize: 40 }}>✅</div>
+          <p style={{ fontSize: 22, fontWeight: 900, color: '#166534' }}>¡Ubicación enviada!</p>
+          <p style={{ color: '#16a34a', marginTop: 8, fontWeight: 600 }}>Ya podés volver a la computadora y continuar con tu pedido.</p>
+        </>
+      )}
+      {status === 'error' && (
+        <>
+          <div style={{ fontSize: 50, marginBottom: 16 }}>❌</div>
+          <p style={{ fontSize: 20, fontWeight: 700, color: '#991b1b' }}>No pudimos obtener tu ubicación.</p>
+          <p style={{ color: '#64748b', marginTop: 8 }}>Activá el GPS en la configuración de tu celu y recargá la página.</p>
+          <button onClick={handleCapture} style={{ marginTop: 20, padding: '12px 28px', background: '#0d9488', color: 'white', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Reintentar</button>
+        </>
+      )}
+      {status === 'idle' && <p style={{ color: '#64748b' }}>Iniciando...</p>}
+    </div>
+  );
+}
+
 export default function App() {
+  // Si estamos en la ruta /gps del celular, renderizar solo esa página
+  if (isGpsPage) return <GpsCapturePage />;
   const { t, i18n } = useTranslation();
   const [products, setProducts] = useState([]);
   const [slides, setSlides] = useState([]);
@@ -1992,27 +2048,37 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
   const [locationLink, setLocationLink] = useState('');
   const [gettingLocation, setGettingLocation] = useState(false);
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Tu navegador no soporta geolocalización.");
-      return;
-    }
-    setGettingLocation(true);
-    const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
-    navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      
-      // Si la precisión es mayor a 300 metros, probablemente está usando WiFi o IP (típico en PC de escritorio)
-      if (accuracy > 300) {
-         alert(`Aviso: Tu señal GPS es débil o estás en una PC de escritorio (precisión de ${Math.round(accuracy)}m). La ubicación enviada no será 100% exacta.`);
-      }
-      
-      setLocationLink(`https://maps.google.com/?q=${latitude},${longitude}`);
-      setGettingLocation(false);
-    }, (error) => {
-      alert("No pudimos obtener tu ubicación exacta. Asegurate de tener el GPS encendido (Ubicación) y de darle permiso al navegador.");
-      setGettingLocation(false);
-    }, options);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrSessionId, setQrSessionId] = useState(null);
+
+  const handleGetLocation = async () => {
+    // Generar session ID único
+    const sid = Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+    setQrSessionId(sid);
+
+    // Crear la sesión en Supabase
+    await supabase.from('gps_sessions').insert({ session_id: sid, status: 'pending' });
+
+    // Escuchar en Realtime hasta recibir la ubicación del celu
+    const channel = supabase
+      .channel('gps-' + sid)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'gps_sessions',
+        filter: `session_id=eq.${sid}`
+      }, (payload) => {
+        if (payload.new.status === 'received') {
+          const { latitude, longitude } = payload.new;
+          setLocationLink(`https://maps.google.com/?q=${latitude},${longitude}`);
+          setQrModalOpen(false);
+          setQrSessionId(null);
+          supabase.removeChannel(channel);
+        }
+      })
+      .subscribe();
+
+    setQrModalOpen(true);
   };
 
   const totalGs = items.reduce((acc, item) => {
@@ -2185,11 +2251,10 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
                   <button 
                     type="button" 
                     onClick={handleGetLocation} 
-                    disabled={gettingLocation}
-                    className={`shrink-0 flex items-center justify-center gap-2 px-4 rounded-xl border font-bold transition-all ${locationLink ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-slate-800 text-white border-transparent hover:bg-slate-700'}`}
-                    title={t("Enviar_ubicacion")}
+                    className={`shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border font-bold transition-all ${locationLink ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-slate-800 text-white border-transparent hover:bg-slate-700'}`}
+                    title="Compartir ubicación con el celular"
                   >
-                    {gettingLocation ? '...' : locationLink ? '✓ GPS' : '📍 GPS'}
+                    {locationLink ? '✓ GPS' : '📍 GPS'}
                   </button>
                 </div>
                 {locationLink && <p className="text-xs text-teal-600 mt-1 font-bold">{t("Ubicacion_exacta")}</p>}
@@ -2233,6 +2298,44 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
           </div>
         )}
       </div>
+
+      {/* Modal QR GPS */}
+      {qrModalOpen && qrSessionId && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center gap-5 border border-slate-100 animate-in zoom-in-95 duration-300 relative">
+            <button
+              onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="bg-teal-50 p-3 rounded-2xl">
+              <span className="text-3xl">📱</span>
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-black text-slate-800">Escanear con tu celular</h3>
+              <p className="text-sm text-slate-500 mt-1">Tu celu tiene GPS real. Escaneá este código para enviar tu ubicación exacta.</p>
+            </div>
+            <div className="bg-white p-3 rounded-2xl border-2 border-teal-200 shadow-sm">
+              <QRCodeSVG
+                value={`${window.location.origin}/gps?s=${qrSessionId}`}
+                size={180}
+                fgColor="#0d9488"
+                level="M"
+              />
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-xs text-slate-400 font-medium">La página se actualizará automáticamente una vez que escanees. El GPS es <span className="font-bold text-slate-600">opcional.</span></p>
+            </div>
+            <button
+              onClick={() => { setQrModalOpen(false); setQrSessionId(null); }}
+              className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors mt-1"
+            >
+              Omitir (continuar sin GPS)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
