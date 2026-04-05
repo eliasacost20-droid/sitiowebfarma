@@ -69,19 +69,23 @@ function GpsCapturePage() {
           <div style={{ width: 64, height: 64, border: '6px solid #0d9488', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 24 }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ fontSize: 20, fontWeight: 700, color: '#334155' }}>Obteniendo tu ubicación exacta...</p>
-          <p style={{ color: '#64748b', marginTop: 8 }}>Asegurate de tener el GPS activado en tu celu 📡</p>
+          <p style={{ color: '#64748b', marginTop: 8 }}>Asegurate de tener el GPS activado en tu celu</p>
         </>
       )}
       {status === 'success' && (
         <>
-          <div style={{ width: 80, height: 80, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, fontSize: 40 }}>✅</div>
+          <div style={{ width: 80, height: 80, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
           <p style={{ fontSize: 22, fontWeight: 900, color: '#166534' }}>¡Ubicación enviada!</p>
           <p style={{ color: '#16a34a', marginTop: 8, fontWeight: 600 }}>Ya podés volver a la computadora y continuar con tu pedido.</p>
         </>
       )}
       {status === 'error' && (
         <>
-          <div style={{ fontSize: 50, marginBottom: 16 }}>❌</div>
+          <div style={{ width: 80, height: 80, background: '#fee2e2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
           <p style={{ fontSize: 20, fontWeight: 700, color: '#991b1b' }}>No pudimos obtener tu ubicación.</p>
           <p style={{ color: '#64748b', marginTop: 8 }}>Activá el GPS en la configuración de tu celu y recargá la página.</p>
           <button onClick={handleCapture} style={{ marginTop: 20, padding: '12px 28px', background: '#0d9488', color: 'white', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Reintentar</button>
@@ -2309,8 +2313,8 @@ function CartModal({ items, onClose, onRemoveItem, onIncrease, onDecrease }) {
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="bg-teal-50 p-3 rounded-2xl">
-              <span className="text-3xl">📱</span>
+            <div className="bg-teal-50 p-4 rounded-2xl">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="12" x="2" y="6" rx="1"/><path d="M17.5 7 22 12l-4.5 5"/><path d="M14 12H22"/></svg>
             </div>
             <div className="text-center">
               <h3 className="text-xl font-black text-slate-800">Escanear con tu celular</h3>
